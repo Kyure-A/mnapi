@@ -16,6 +16,33 @@ type URLparams = {
     theme: "login_form"
 };
 
+type fResponse = {
+    "request_id": string,
+    "timestamp": number,
+    "f": string
+}
+
+type AccessTokenResponse = {
+    "result": {
+        "user": {
+            "imageUri": string, // url
+            "supportId": string,
+            "name": string,
+            "id": string[]
+        },
+        "firebaseCredential": {
+            "accessToken": string, // firebase token here
+            "expiresIn": number // 3600
+        },
+        "webApiServerCredential": {
+            "accessToken": string, // webapi token here
+            "expiresIn": number //7200
+        }
+    },
+    "status": number, // 0
+    "correlationId": string // "61becf03-0ae45082"
+}
+
 // https://dev.to/mathewthe2/intro-to-nintendo-switch-rest-api-2cm7
 
 function calculateChallenge(codeVerifier: string): string {
@@ -142,7 +169,17 @@ export function getSessionTokenCode(): Option<string> {
 
         const redirectLink = redirectLinkElem.getAttribute("href");
 
-        return Some(redirectLink);
+        return redirectLink;
+
+    }).then((redirectLink) => {
+
+        const parser = new URL(redirectLink);
+
+        if (parser.searchParams.has("session_token_code")) {
+            const result = parser.searchParams.get("session_token_code");
+            return Some(result);
+        }
+        else return None;
 
     }).catch((error) => {
         console.log("Error ", error);
@@ -151,6 +188,88 @@ export function getSessionTokenCode(): Option<string> {
     return None;
 }
 
+function getF(token: string): Option<fResponse> {
+    const param = {
+        "User-Agent": "nx-embeds/1.0.0",
+        "Content-Type": "application/json",
+        "token": token,
+        "hash_method": 1
+    }
+
+    fetch("https://api.imink.app/f", {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json; charset=utf-8"
+        },
+        body: JSON.stringify(param)
+    }).then(response => {
+        return response.json();
+    }).then(data => {
+        console.log(data);
+        return Some(data);
+    });
+
+    return None;
+}
+
+function getSessionToken(session_token_code: string) {
+
+}
+
 // 自動化が検知されて error を吐いてくるのでなんとかする
 
-getSessionTokenCode();
+function getServiceToken(session_token: string) {
+
+}
+
+export async function getAccessToken(service_token: string, request_id: string, f: string, timestamp: number): Promise<Option<string>> {
+    const params = {
+        "parameter": {
+            "language": "en-US",
+            "naBirthday": "2005-07-10",
+            "naCountry": "JP",
+            "naIdToken": service_token,
+            "requestId": request_id,
+            "timestamp": timestamp,
+            "f": f
+        }
+    }
+
+    await fetch("https://api-lp1.znc.srv.nintendo.net/v1/Account/Login", {
+        method: "POST",
+        headers: {
+            body: JSON.stringify(params),
+        }
+
+    }).then(response => {
+        return response.json();
+    }).then(data => {
+        console.log(data);
+        const token: string = data["webApiServerCredential"]["accessToken"];
+        return Some(token);
+    });
+
+    return None;
+}
+
+function getGameList(token: string) {
+    const params = {
+        "Host": "api-lp1.znc.srv.nintendo.net",
+        "Content-Type": "application/json; charset=utf-8",
+        "Content-Length": 0,
+        "Connection": "keep-alive",
+        "X-ProductVersion": "1.0.4",
+        "Accept": "application/json",
+        "User-Agent": "com.nintendo.znca/1.0.4 (iOS/10.3.3)",
+        "Accept-Language": "en-us",
+        "X-Platform": "iOS",
+        "Authorization": `Bearer: ${token}`
+    }
+
+    fetch("https://api-lp1.znc.srv.nintendo.net/v1/Game/ListWebServices", {
+        method: "POST",
+        headers: {
+            body: JSON.stringify(params),
+        }
+    });
+}
