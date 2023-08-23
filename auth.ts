@@ -1,10 +1,9 @@
-import * as crypto from "crypto";
-import * as base64url from "base64-url";
-import * as Selenium from "selenium-webdriver";
-import * as Chromedriver from "chromedriver";
 import { Option, Some, None } from "@sniptt/monads";
-import * as dotenv from "dotenv";
-dotenv.config();
+import * as base64url from "base64-url";
+import * as crypto from "crypto";
+import * as dotenv from "dotenv"; dotenv.config();
+import { pipe } from "fp-ts/function";
+import * as Selenium from "selenium-webdriver";
 
 type URLparams = {
     state: string,
@@ -297,4 +296,11 @@ export function getAccessToken(language: string, birthday: string, country: stri
     });
 
     return None;
+}
+
+function auth() {
+
+    // たぶんこういう感じのゲボカスネストになる
+    // => pipe をつかいたい
+    getAccessToken(getUserInfo(getServiceToken(getSessionToken(getSessionTokenCode(), base64url.encode(crypto.randomBytes(32).toString())))), getServiceToken(getSessionToken(getSessionTokenCode(), base64url.encode(crypto.randomBytes(32).toString()))));
 }

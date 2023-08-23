@@ -1,5 +1,19 @@
 import { getAccessToken } from "./auth.js"
 
+type Game = {
+    "whiteList": string[],
+    "id": number,
+    "uri": string,
+    "name": string,
+    "imageUri": string
+}
+
+type GameList = {
+    "status": number,
+    "correlationId": string,
+    "result": Game[]
+}
+
 function getGameList(access_token: string) {
     const params = {
         "Content-Type": "application/json; charset=utf-8",
@@ -15,4 +29,19 @@ function getGameList(access_token: string) {
             body: JSON.stringify(params),
         }
     });
+}
+
+function parseGameList(game_list: GameList) {
+    let result = [];
+
+    for (let i = 0; i < game_list.result.length; i++) {
+        const game_info = {
+            name: game_list.result[i].name,
+            icon: game_list.result[i].imageUri,
+            url: game_list.result[i].uri
+        }
+        result.push(game_info);
+    }
+
+    return result;
 }
