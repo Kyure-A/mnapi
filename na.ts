@@ -1,4 +1,5 @@
 import { Option, Some, None } from "@sniptt/monads";
+import { getSessionTokenCode } from "./auth.js"
 
 type fResponse = {
     "request_id": string,
@@ -31,7 +32,7 @@ async function getF(token: string): Promise<Option<fResponse>> {
     const param = {
         "User-Agent": "nx-embeds/1.0.0",
         "Content-Type": "application/json",
-        "token": token,
+        "token": getSessionTokenCode(),
         "hash_method": 1
     }
 
