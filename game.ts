@@ -1,5 +1,7 @@
 import { auth } from "./auth.js"
 
+const NSOAppVersion = "2.5.1";
+
 type Game = {
     "whiteList": string[],
     "id": number,
@@ -17,9 +19,9 @@ type GameList = {
 function getGameList(access_token: string) {
     const params = {
         "Content-Type": "application/json; charset=utf-8",
-        "X-ProductVersion": "1.0.4",
-        "X-Platform": "iOS",
-        "User-Agent": "com.nintendo.znca/1.0.4 (iOS/10.3.3)",
+        "X-ProductVersion": NSOAppVersion,
+        "X-Platform": "Android",
+        "User-Agent": "com.nintendo.znca/${NSOAppVersion} (Android/7.1.2)",
         "Authorization": `Bearer: ${access_token}`
     };
 
