@@ -75,7 +75,6 @@ export async function getSessionToken(session_token_code: string, code_verifier:
                 'X-Platform': 'Android',
                 'X-ProductVersion': NSOAppVersion,
                 'User-Agent': `OnlineLounge/${NSOAppVersion} NASDKAPI Android`,
-                'Host': "accounts.nintendo.com",
             },
         });
 
@@ -87,19 +86,18 @@ export async function getSessionToken(session_token_code: string, code_verifier:
     }
 }
 
-async function fAPI(session_token: string): Promise<Option<fResponse>> {
-    const param = {
+export async function fAPI(session_token: string): Promise<Option<fResponse>> {
+    const params = {
         "token": session_token,
         "hash_method": 1
     }
 
     try {
-        const response = await Axios.post("https://api.imink.app/f", {
+        const response = await Axios.post("https://api.imink.app/f", params, {
             headers: {
                 "Content-Type": "application/json; charset=utf-8",
                 "User-Agent": "nx-embeds/1.0.0",
             },
-            body: JSON.stringify(param)
         });
         return Some({
             request_id: response.data.request_id,
@@ -113,7 +111,7 @@ async function fAPI(session_token: string): Promise<Option<fResponse>> {
     }
 }
 
-async function getServiceToken(session_token: string): Promise<Option<string>> {
+export async function getServiceToken(session_token: string): Promise<Option<string>> {
     const params = {
         client_id: "71b963c1b7b6d119",
         grant_type: "urn:ietf:params:oauth:grant-type:jwt-bearer-session-token",
