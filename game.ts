@@ -1,4 +1,4 @@
-import { getAccessToken } from "./auth.js"
+import { auth } from "./auth.js"
 
 type Game = {
     "whiteList": string[],

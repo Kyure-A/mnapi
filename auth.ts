@@ -1,4 +1,5 @@
 import { Option, Some, None } from "@sniptt/monads";
+import axios from "axios";
 import * as base64url from "base64-url";
 import * as crypto from "crypto";
 import * as dotenv from "dotenv"; dotenv.config();
@@ -19,6 +20,12 @@ type fResponse = {
     "request_id": string,
     "timestamp": number,
     "f": string
+};
+
+type UserInfo = {
+    language: string,
+    birthday: string,
+    country: string,
 };
 
 type AccessTokenResponse = {
@@ -187,73 +194,86 @@ export function getSessionTokenCode(): Option<string> {
     return None;
 }
 
-function getF(token: string): Option<fResponse> {
+async function fAPI(token: string): Promise<Option<fResponse>> {
     const param = {
-        "User-Agent": "nx-embeds/1.0.0",
-        "Content-Type": "application/json",
         "token": token,
         "hash_method": 1
     }
 
-    fetch("https://api.imink.app/f", {
-        method: "POST",
-        headers: {
-            "Content-Type": "application/json; charset=utf-8"
-        },
-        body: JSON.stringify(param)
-    }).then(response => {
-        return response.json();
-    }).then(data => {
-        console.log(data);
-        return Some(data);
-    });
-
-    return None;
+    try {
+        const response = await axios.post("https://api.imink.app/f", {
+            headers: {
+                "Content-Type": "application/json; charset=utf-8",
+                "User-Agent": "nx-embeds/1.0.0",
+            },
+            body: JSON.stringify(param)
+        });
+        return Some({
+            request_id: response.data.request_id,
+            timestamp: response.data.timestamp,
+            f: response.data.f
+        });
+    }
+    catch (error) {
+        console.error(error);
+        return None;
+    }
 }
 
-function getSessionToken(session_token_code: string, codeVerifier: string) {
+async function getSessionToken(session_token_code: string, codeVerifier: string): Promise<Option<string>> {
     const params = {
         client_id: "71b963c1b7b6d119",
         session_token_code: session_token_code,
         session_token_code_verifier: codeVerifier
     }
 
-    fetch("https://accounts.nintendo.com/connect/1.0.0/api/session_token", {
-        method: "POST",
-        headers: {
-            'Content-Type': 'application/x-www-form-urlencoded',
-            'X-Platform': 'Android',
-            'X-ProductVersion': "1.9.0",
-            'User-Agent': `OnlineLounge/1.9.0 NASDKAPI Android`,
-
+    try {
+        const response = await axios.post("https://accounts.nintendo.com/connect/1.0.0/api/session_token", {
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+                'X-Platform': 'Android',
+                'X-ProductVersion': "1.9.0",
+                'User-Agent': `OnlineLounge/1.9.0 NASDKAPI Android`,
+            },
             body: JSON.stringify(params),
-        }
-    })
+        });
+
+        return Some(response.data.session_token);
+    }
+    catch (error) {
+        console.error(error);
+        return None;
+    }
 }
 
 // 自動化が検知されて error を吐いてくるのでなんとかする
 
-function getServiceToken(session_token: string) {
+async function getServiceToken(session_token: string): Promise<Option<string>> {
     const params = {
         client_id: "71b963c1b7b6d119",
         grant_type: "urn:ietf:params:oauth:grant-type:jwt-bearer-session-token",
         session_token: session_token,
     }
 
-    fetch("https://accounts.nintendo.com/connect/1.0.0/api/token", {
-        method: "POST",
-        headers: {
-            'Content-Type': 'application/x-www-form-urlencoded',
-            'X-Platform': 'Android',
-            'X-ProductVersion': "1.9.0",
-            'User-Agent': `OnlineLounge/1.9.0 NASDKAPI Android`,
-
+    try {
+        const response = await axios.post("https://accounts.nintendo.com/connect/1.0.0/api/token", {
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+                'X-Platform': 'Android',
+                'X-ProductVersion': "1.9.0",
+                'User-Agent': `OnlineLounge/1.9.0 NASDKAPI Android`,
+            },
             body: JSON.stringify(params),
-        }
-    })
+        })
+        return Some(response.data.id_token);
+    }
+    catch (error) {
+        console.error(error);
+        return None;
+    }
 }
 
-function getUserInfo(service_token: string) {
+async function getUserInfo(service_token: string): Promise<Option<UserInfo>> {
     const params = {
         'Content-Type': 'application/json; charset=utf-8',
         'X-Platform': 'Android',
@@ -262,13 +282,23 @@ function getUserInfo(service_token: string) {
         Authorization: `Bearer ${service_token}`
     }
 
-    fetch("https://api.accounts.nintendo.com/2.0.0/users/me", {
-        method: "GET",
-        headers: params,
-    })
+    try {
+        const response = await axios.get("https://api.accounts.nintendo.com/2.0.0/users/me", {
+            headers: params,
+        });
+        return Some({
+            language: response.data.language,
+            birthday: response.data.birthday,
+            country: response.data.country
+        });
+    }
+    catch (error) {
+        console.log(error);
+        return None;
+    }
 }
 
-export function getAccessToken(language: string, birthday: string, country: string, service_token: string, request_id: string, f: string, timestamp: number): Option<string> {
+async function getAccessToken(language: string, birthday: string, country: string, service_token: string, request_id: string, timestamp: number, f: string): Promise<Option<string>> {
     const params = {
         "parameter": {
             "language": language,
@@ -281,26 +311,41 @@ export function getAccessToken(language: string, birthday: string, country: stri
         }
     }
 
-    fetch("https://api-lp1.znc.srv.nintendo.net/v1/Account/Login", {
-        method: "POST",
-        headers: {
-            body: JSON.stringify(params),
-        }
-
-    }).then(response => {
-        return response.json();
-    }).then(data => {
-        console.log(data);
-        const token: string = data["webApiServerCredential"]["accessToken"];
+    try {
+        const response = await axios.post("https://api-lp1.znc.srv.nintendo.net/v1/Account/Login", {
+            headers: {
+                body: JSON.stringify(params),
+            }
+        });
+        const token: string = response.data.webApiServerCredential.accessToken;
         return Some(token);
-    });
-
-    return None;
+    }
+    catch (error) {
+        console.error(error);
+        return None;
+    }
 }
 
-function auth() {
+export async function auth(session_token_code: string): Promise<Option<string>> {
+    try {
+        const codeVerifier = base64url.encode(crypto.randomBytes(32).toString());
+        const session_token = (await getSessionToken(session_token_code, codeVerifier)).unwrap();
+        const service_token = (await getServiceToken(session_token)).unwrap();
+        const user_info = (await getUserInfo(service_token)).unwrap();
+        const f_response = (await fAPI(session_token)).unwrap();
+        const language = user_info.language;
+        const birthday = user_info.birthday;
+        const country = user_info.country;
+        const request_id = f_response.request_id;
+        const timestamp = f_response.timestamp;
+        const f = f_response.f;
 
-    // たぶんこういう感じのゲボカスネストになる
-    // => pipe をつかいたい
-    getAccessToken(getUserInfo(getServiceToken(getSessionToken(getSessionTokenCode(), base64url.encode(crypto.randomBytes(32).toString())))), getServiceToken(getSessionToken(getSessionTokenCode(), base64url.encode(crypto.randomBytes(32).toString()))));
+        const access_token = (await getAccessToken(language, birthday, country, service_token, request_id, timestamp, f)).unwrap();
+
+        return Some(access_token);
+    }
+    catch (error) {
+        console.error(error);
+        return None;
+    }
 }
