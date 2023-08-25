@@ -54,13 +54,6 @@ type AccessTokenResponse = {
 
 const NSOAppVersion = "2.5.1";
 
-const headers = {
-    'Content-Type': 'application/x-www-form-urlencoded',
-    'X-Platform': 'Android',
-    'X-ProductVersion': NSOAppVersion,
-    'User-Agent': `OnlineLounge/${NSOAppVersion} NASDKAPI Android`,
-}
-
 export async function getSessionToken(session_token_code: string, code_verifier: string): Promise<Option<string>> {
     const params = {
         client_id: "71b963c1b7b6d119",
@@ -71,10 +64,15 @@ export async function getSessionToken(session_token_code: string, code_verifier:
     try {
         const response = await Axios.post("https://accounts.nintendo.com/connect/1.0.0/api/session_token", params, {
             headers: {
+                'User-Agent': `OnlineLounge/${NSOAppVersion} NASDKAPI Android`,
+                'Accept-Language': 'en-US',
+                'Accept': 'application/json',
                 'Content-Type': 'application/x-www-form-urlencoded',
+                'Host': 'accounts.nintendo.com',
+                'Connection': 'Keep-Alive',
+                'Accept-Encoding': 'gzip',
                 'X-Platform': 'Android',
                 'X-ProductVersion': NSOAppVersion,
-                'User-Agent': `OnlineLounge/${NSOAppVersion} NASDKAPI Android`,
             },
         });
 
@@ -120,7 +118,12 @@ export async function getServiceToken(session_token: string): Promise<Option<str
 
     try {
         const response = await Axios.post("https://accounts.nintendo.com/connect/1.0.0/api/token", {
-            headers: headers,
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+                'X-Platform': 'Android',
+                'X-ProductVersion': NSOAppVersion,
+                'User-Agent': `OnlineLounge/${NSOAppVersion} NASDKAPI Android`,
+            },
             data: params,
         })
         return Some(response.data.id_token);
@@ -171,7 +174,12 @@ async function getAccessToken(language: string, birthday: string, country: strin
 
     try {
         const response = await Axios.post("https://api-lp1.znc.srv.nintendo.net/v1/Account/Login", {
-            headers: headers,
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+                'X-Platform': 'Android',
+                'X-ProductVersion': NSOAppVersion,
+                'User-Agent': `OnlineLounge/${NSOAppVersion} NASDKAPI Android`,
+            },
             body: params
         });
         const token: string = response.data.webApiServerCredential.accessToken;

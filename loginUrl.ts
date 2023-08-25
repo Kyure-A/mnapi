@@ -17,8 +17,8 @@ type URLparams = {
 
 type AuthParams = {
     state: string,
-    codeVerifier: string,
-    codeChallenge: string,
+    code_verifier: string,
+    code_challenge: string,
 }
 
 type RedirectLinkParams = {
@@ -37,13 +37,13 @@ function calculateChallenge(codeVerifier: string): string {
 }
 
 function generateAuthenticationParams(): AuthParams {
-    const state = base64url.encode(crypto.randomBytes(36).toString())
-    const codeVerifier = base64url.encode(crypto.randomBytes(32).toString());
-    const codeChallenge = calculateChallenge(codeVerifier);
+    const state = crypto.randomBytes(36).toString('base64url');
+    const code_verifier = crypto.randomBytes(32).toString('base64url');
+    const code_challenge = crypto.createHash('sha256').update(code_verifier).digest().toString('base64url'); // calculateChallenge(codeVerifier);
     return {
         state: state,
-        codeVerifier: codeVerifier,
-        codeChallenge: codeChallenge
+        code_verifier: code_verifier,
+        code_challenge: code_challenge
     };
 }
 
@@ -67,7 +67,7 @@ export function getLoginUrl() {
         redirect_uri: "npf71b963c1b7b6d119://auth&client_id=71b963c1b7b6d119",
         scope: "openid%20user%20user.birthday%20user.mii%20user.screenName",
         response_type: "session_token_code",
-        session_token_code_challenge: authParams.codeChallenge,
+        session_token_code_challenge: authParams.code_challenge,
         session_token_code_challenge_method: "S256",
         theme: "login_form"
     };
@@ -86,7 +86,7 @@ export function getLoginUrl() {
 
     return {
         url: `https://accounts.nintendo.com/connect/1.0.0/authorize?${stringParams}`,
-        cv: authParams.codeVerifier
+        cv: authParams.code_verifier
     }
     // Nintendo の page に redirect されて、 authorize-switch-approval-link に session_token_code がふくまれる url がはいってる
 }

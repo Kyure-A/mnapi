@@ -7,7 +7,8 @@ type Game = {
     "id": number,
     "uri": string,
     "name": string,
-    "imageUri": string
+    "imageUri": string,
+    "hogehoge": string,
 }
 
 type GameList = {
@@ -40,7 +41,8 @@ function parseGameList(game_list: GameList) {
         const game_info = {
             name: game_list.result[i].name,
             icon: game_list.result[i].imageUri,
-            url: game_list.result[i].uri
+            url: game_list.result[i].uri,
+            playtime: game_list.result[i].hogehoge
         }
         result.push(game_info);
     }
