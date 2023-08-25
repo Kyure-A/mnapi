@@ -1,9 +1,8 @@
+import { getLoginUrl, redirectLinkParser } from "./loginUrl.js"
 import { Option, Some, None } from "@sniptt/monads";
 import axios from "axios";
-import * as base64url from "base64-url";
-import * as crypto from "crypto";
 import { wrapper } from "axios-cookiejar-support";
-import { pipe } from "fp-ts/function";
+import * as readline from "readline"
 import { CookieJar } from "tough-cookie";
 
 declare module 'axios' {
@@ -109,7 +108,7 @@ export async function fAPI(session_token: string): Promise<Option<fResponse>> {
     }
 }
 
-export async function getServiceToken(session_token: string): Promise<Option<string>> {
+export async function getServiceToken(session_token: string): Promise<Option<{ id_token: string, access_token: string }>> {
     const params = {
         client_id: "71b963c1b7b6d119",
         grant_type: "urn:ietf:params:oauth:grant-type:jwt-bearer-session-token",
@@ -117,16 +116,15 @@ export async function getServiceToken(session_token: string): Promise<Option<str
     }
 
     try {
-        const response = await Axios.post("https://accounts.nintendo.com/connect/1.0.0/api/token", {
+        const response = await Axios.post("https://accounts.nintendo.com/connect/1.0.0/api/token", params, {
             headers: {
                 'Content-Type': 'application/x-www-form-urlencoded',
                 'X-Platform': 'Android',
                 'X-ProductVersion': NSOAppVersion,
                 'User-Agent': `OnlineLounge/${NSOAppVersion} NASDKAPI Android`,
             },
-            data: params,
         })
-        return Some(response.data.id_token);
+        return Some({ id_token: response.data.id_token, access_token: response.data.access_token });
     }
     catch (error) {
         console.error(error);
@@ -134,7 +132,7 @@ export async function getServiceToken(session_token: string): Promise<Option<str
     }
 }
 
-async function getUserInfo(service_token: string): Promise<Option<UserInfo>> {
+export async function getUserInfo(service_token: string): Promise<Option<UserInfo>> {
     const params = {
         'Content-Type': 'application/json; charset=utf-8',
         'X-Platform': 'Android',
@@ -159,7 +157,7 @@ async function getUserInfo(service_token: string): Promise<Option<UserInfo>> {
     }
 }
 
-async function getAccessToken(language: string, birthday: string, country: string, service_token: string, request_id: string, timestamp: number, f: string): Promise<Option<string>> {
+export async function getAccessToken(language: string, birthday: string, country: string, service_token: string, request_id: string, timestamp: number, f: string): Promise<Option<any>> {
     const params = {
         "parameter": {
             "language": language,
@@ -175,15 +173,16 @@ async function getAccessToken(language: string, birthday: string, country: strin
     try {
         const response = await Axios.post("https://api-lp1.znc.srv.nintendo.net/v1/Account/Login", {
             headers: {
-                'Content-Type': 'application/x-www-form-urlencoded',
-                'X-Platform': 'Android',
+                'Content-Type': 'application/json; charset=utf-8',
+                'Accept': 'application/json',
                 'X-ProductVersion': NSOAppVersion,
-                'User-Agent': `OnlineLounge/${NSOAppVersion} NASDKAPI Android`,
+                'User-Agent': `com.nintendo.znca/${NSOAppVersion} (Android/7.1.2)`,
+                Authorization: 'Bearer'
             },
             body: params
         });
-        const token: string = response.data.webApiServerCredential.accessToken;
-        return Some(token);
+        // const token: string = response.data.webApiServerCredential.accessToken;
+        return Some(response.data);
     }
     catch (error) {
         console.error(error);
@@ -191,21 +190,48 @@ async function getAccessToken(language: string, birthday: string, country: strin
     }
 }
 
-export async function auth(session_token_code: string): Promise<Option<string>> {
+async function input(prompt: string): Promise<string> {
+    process.stdin.setEncoding('utf-8');
+    return new Promise((resolve) => {
+        readline.createInterface({
+            input: process.stdin,
+            output: process.stdout
+        }).question(prompt, (result) => {
+            resolve(result);
+        });
+    });
+}
+
+export async function auth(): Promise<Option<string>> {
     try {
-        const code_verifier = base64url.encode(crypto.randomBytes(32).toString());
+        const auth_params = getLoginUrl();
+
+        console.log(auth_params.url);
+
+        const login_url = redirectLinkParser(await input("Please jump to the following URL, copy the URL starting with 'npf71b963c1b7b6d119://' and paste it into the standard input: "));
+
+        const session_token_code: string = login_url.session_token_code;
+        const code_verifier = auth_params.code_verifier;
         const session_token = (await getSessionToken(session_token_code, code_verifier)).unwrap();
+
         const service_token = (await getServiceToken(session_token)).unwrap();
-        const user_info = (await getUserInfo(service_token)).unwrap();
-        const f_response = (await fAPI(session_token)).unwrap();
+        const service_id_token = service_token.id_token;
+        const service_access_token = service_token.access_token;
+
+        const user_info = (await getUserInfo(service_access_token)).unwrap();
         const language = user_info.language;
         const birthday = user_info.birthday;
         const country = user_info.country;
+
+        const f_response = (await fAPI(session_token)).unwrap();
         const request_id = f_response.request_id;
         const timestamp = f_response.timestamp;
         const f = f_response.f;
 
-        const access_token = (await getAccessToken(language, birthday, country, service_token, request_id, timestamp, f)).unwrap();
+        // service_token までの生成がうまく行っているかの確認
+        console.log(birthday);
+
+        const access_token = (await getAccessToken(language, birthday, country, service_id_token, request_id, timestamp, f)).unwrap();
 
         return Some(access_token);
     }

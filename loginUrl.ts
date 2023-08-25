@@ -29,17 +29,10 @@ type RedirectLinkParams = {
 
 // https://dev.to/mathewthe2/intro-to-nintendo-switch-rest-api-2cm7
 
-function calculateChallenge(codeVerifier: string): string {
-    const hash = crypto.createHash('sha256');
-    hash.update(codeVerifier);
-    const codeChallenge: string = base64url.encode(hash.digest().toString());
-    return codeChallenge;
-}
-
 function generateAuthenticationParams(): AuthParams {
     const state = crypto.randomBytes(36).toString('base64url');
     const code_verifier = crypto.randomBytes(32).toString('base64url');
-    const code_challenge = crypto.createHash('sha256').update(code_verifier).digest().toString('base64url'); // calculateChallenge(codeVerifier);
+    const code_challenge = crypto.createHash('sha256').update(code_verifier).digest().toString('base64url');
     return {
         state: state,
         code_verifier: code_verifier,
@@ -86,7 +79,7 @@ export function getLoginUrl() {
 
     return {
         url: `https://accounts.nintendo.com/connect/1.0.0/authorize?${stringParams}`,
-        cv: authParams.code_verifier
+        code_verifier: authParams.code_verifier
     }
     // Nintendo の page に redirect されて、 authorize-switch-approval-link に session_token_code がふくまれる url がはいってる
 }
