@@ -1,9 +1,10 @@
-import { getLoginUrl, redirectLinkParser } from "./loginUrl.js"
+import { getLoginUrl } from "./login.js"
+import { input, redirectLinkParser } from "./util.js"
 import { Option, Some, None } from "@sniptt/monads";
 import axios from "axios";
 import { wrapper } from "axios-cookiejar-support";
-import * as readline from "readline"
 import { CookieJar } from "tough-cookie";
+import { NSOAppVersion } from "./constant.js"
 
 declare module 'axios' {
     interface AxiosRequestConfig {
@@ -51,8 +52,6 @@ type AccessTokenResponse = {
 
 // --------------------------------------------------------------------------------------------------------- //
 
-const NSOAppVersion = "2.5.1";
-
 export async function getSessionToken(session_token_code: string, code_verifier: string): Promise<Option<string>> {
     const params = {
         client_id: "71b963c1b7b6d119",
@@ -63,15 +62,15 @@ export async function getSessionToken(session_token_code: string, code_verifier:
     try {
         const response = await Axios.post("https://accounts.nintendo.com/connect/1.0.0/api/session_token", params, {
             headers: {
-                'User-Agent': `OnlineLounge/${NSOAppVersion} NASDKAPI Android`,
-                'Accept-Language': 'en-US',
-                'Accept': 'application/json',
-                'Content-Type': 'application/x-www-form-urlencoded',
-                'Host': 'accounts.nintendo.com',
-                'Connection': 'Keep-Alive',
-                'Accept-Encoding': 'gzip',
-                'X-Platform': 'Android',
-                'X-ProductVersion': NSOAppVersion,
+                "Accept": "application/json",
+                "Accept-Encoding": "gzip",
+                "Accept-Language": "en-US",
+                "Connection": "Keep-Alive",
+                "Content-Type": "application/x-www-form-urlencoded",
+                "Host": "accounts.nintendo.com",
+                "User-Agent": `OnlineLounge/${NSOAppVersion} NASDKAPI Android`,
+                "X-Platform": "Android",
+                "X-ProductVersion": NSOAppVersion,
             },
         });
 
@@ -86,7 +85,7 @@ export async function getSessionToken(session_token_code: string, code_verifier:
 export async function fAPI(session_token: string): Promise<Option<fResponse>> {
     const params = {
         "token": session_token,
-        "hash_method": 1
+        "hash_method": 2
     }
 
     try {
@@ -118,10 +117,10 @@ export async function getServiceToken(session_token: string): Promise<Option<{ i
     try {
         const response = await Axios.post("https://accounts.nintendo.com/connect/1.0.0/api/token", params, {
             headers: {
-                'Content-Type': 'application/x-www-form-urlencoded',
-                'X-Platform': 'Android',
-                'X-ProductVersion': NSOAppVersion,
-                'User-Agent': `OnlineLounge/${NSOAppVersion} NASDKAPI Android`,
+                "Content-Type": "application/x-www-form-urlencoded",
+                "User-Agent": `OnlineLounge/${NSOAppVersion} NASDKAPI Android`,
+                "X-Platform": "Android",
+                "X-ProductVersion": NSOAppVersion,
             },
         })
         return Some({ id_token: response.data.id_token, access_token: response.data.access_token });
@@ -134,11 +133,11 @@ export async function getServiceToken(session_token: string): Promise<Option<{ i
 
 export async function getUserInfo(service_token: string): Promise<Option<UserInfo>> {
     const params = {
-        'Content-Type': 'application/json; charset=utf-8',
-        'X-Platform': 'Android',
-        'X-ProductVersion': "2.7.0",
-        'User-Agent': "OnlineLounge/2.7.0 NASDKAPI Android",
-        Authorization: `Bearer ${service_token}`
+        "Authorization": `Bearer ${service_token}`,
+        "Content-Type": "application/json; charset=utf-8",
+        "User-Agent": "OnlineLounge/2.7.0 NASDKAPI Android",
+        "X-Platform": "Android",
+        "X-ProductVersion": "2.7.0",
     }
 
     try {
@@ -173,13 +172,17 @@ export async function getAccessToken(language: string, birthday: string, country
     try {
         const response = await Axios.post("https://api-lp1.znc.srv.nintendo.net/v1/Account/Login", {
             headers: {
-                'Content-Type': 'application/json; charset=utf-8',
-                'Accept': 'application/json',
-                'X-ProductVersion': NSOAppVersion,
-                'User-Agent': `com.nintendo.znca/${NSOAppVersion} (Android/7.1.2)`,
-                Authorization: 'Bearer'
+                "Accept": "application/json",
+                "Accept-Encoding": "gzip",
+                "Accept-Language": language,
+                "Authorization": "Bearer",
+                "Connection": "Keep-Alive",
+                "Content-Type": "application/json; charset=utf-8",
+                "User-Agent": `com.nintendo.znca/${NSOAppVersion} (Android/7.1.2)`,
+                "X-Platform": "Android",
+                "X-ProductVersion": NSOAppVersion,
             },
-            body: params
+            body: params,
         });
         // const token: string = response.data.webApiServerCredential.accessToken;
         return Some(response.data);
@@ -190,23 +193,11 @@ export async function getAccessToken(language: string, birthday: string, country
     }
 }
 
-async function input(prompt: string): Promise<string> {
-    process.stdin.setEncoding('utf-8');
-    return new Promise((resolve) => {
-        readline.createInterface({
-            input: process.stdin,
-            output: process.stdout
-        }).question(prompt, (result) => {
-            resolve(result);
-        });
-    });
-}
-
-export async function auth(): Promise<Option<string>> {
+export async function auth(): Promise<Option<AccessTokenResponse>> {
     try {
         const auth_params = getLoginUrl();
 
-        console.log(auth_params.url);
+        console.log("Auth URL: " + "\u001b[32m" + auth_params.url + "\u001b[0m"); // green text
 
         const login_url = redirectLinkParser(await input("Please jump to the following URL, copy the URL starting with 'npf71b963c1b7b6d119://' and paste it into the standard input: "));
 
@@ -223,7 +214,7 @@ export async function auth(): Promise<Option<string>> {
         const birthday = user_info.birthday;
         const country = user_info.country;
 
-        const f_response = (await fAPI(session_token)).unwrap();
+        const f_response = (await fAPI(service_access_token)).unwrap();
         const request_id = f_response.request_id;
         const timestamp = f_response.timestamp;
         const f = f_response.f;
@@ -231,7 +222,7 @@ export async function auth(): Promise<Option<string>> {
         // service_token までの生成がうまく行っているかの確認
         console.log(birthday);
 
-        const access_token = (await getAccessToken(language, birthday, country, service_id_token, request_id, timestamp, f)).unwrap();
+        const access_token: AccessTokenResponse = (await getAccessToken(language, birthday, country, service_id_token, request_id, timestamp, f)).unwrap();
 
         return Some(access_token);
     }

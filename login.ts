@@ -1,9 +1,7 @@
 import { Option, Some, None } from "@sniptt/monads";
-import * as base64url from "base64-url";
 import * as crypto from "crypto";
 import * as dotenv from "dotenv"; dotenv.config();
 import * as Selenium from "selenium-webdriver";
-import qs from "qs";
 
 type URLparams = {
     state: string,
@@ -21,12 +19,6 @@ type AuthParams = {
     code_challenge: string,
 }
 
-type RedirectLinkParams = {
-    session_state: string,
-    session_token_code: string,
-    state: string
-}
-
 // https://dev.to/mathewthe2/intro-to-nintendo-switch-rest-api-2cm7
 
 function generateAuthenticationParams(): AuthParams {
@@ -38,18 +30,6 @@ function generateAuthenticationParams(): AuthParams {
         code_verifier: code_verifier,
         code_challenge: code_challenge
     };
-}
-
-export function redirectLinkParser(url: string): RedirectLinkParams {
-    const params = url.split('#')[1];
-    const parsed_params = qs.parse(params);
-    const result: RedirectLinkParams = {
-        state: parsed_params.state as string,
-        session_token_code: parsed_params.session_token_code as string,
-        session_state: parsed_params.session_state as string,
-    }
-
-    return result;
 }
 
 export function getLoginUrl() {
