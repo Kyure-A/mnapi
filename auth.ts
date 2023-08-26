@@ -1,10 +1,10 @@
+import { NSOAppVersion } from "./constant.js"
 import { getLoginUrl } from "./login.js"
 import { input, redirectLinkParser } from "./util.js"
 import { Option, Some, None } from "@sniptt/monads";
 import axios from "axios";
 import { wrapper } from "axios-cookiejar-support";
 import { CookieJar } from "tough-cookie";
-import { NSOAppVersion } from "./constant.js"
 
 declare module 'axios' {
     interface AxiosRequestConfig {
@@ -82,10 +82,10 @@ export async function getSessionToken(session_token_code: string, code_verifier:
     }
 }
 
-export async function fAPI(session_token: string): Promise<Option<fResponse>> {
+export async function fAPI(service_id_token: string): Promise<Option<fResponse>> {
     const params = {
-        "token": session_token,
-        "hash_method": 2
+        "token": service_id_token,
+        "hash_method": 1
     }
 
     try {
@@ -144,6 +144,7 @@ export async function getUserInfo(service_token: string): Promise<Option<UserInf
         const response = await Axios.get("https://api.accounts.nintendo.com/2.0.0/users/me", {
             headers: params,
         });
+
         return Some({
             language: response.data.language,
             birthday: response.data.birthday,
@@ -156,7 +157,7 @@ export async function getUserInfo(service_token: string): Promise<Option<UserInf
     }
 }
 
-export async function getAccessToken(language: string, birthday: string, country: string, service_token: string, request_id: string, timestamp: number, f: string): Promise<Option<any>> {
+export async function getAccessToken(language: string, birthday: string, country: string, service_token: string, request_id: string, timestamp: number, f: string): Promise<Option<string>> {
     const params = {
         "parameter": {
             "language": language,
@@ -170,7 +171,7 @@ export async function getAccessToken(language: string, birthday: string, country
     }
 
     try {
-        const response = await Axios.post("https://api-lp1.znc.srv.nintendo.net/v1/Account/Login", {
+        const response = await Axios.post("https://api-lp1.znc.srv.nintendo.net/v1/Account/Login", params, {
             headers: {
                 "Accept": "application/json",
                 "Accept-Encoding": "gzip",
@@ -182,10 +183,9 @@ export async function getAccessToken(language: string, birthday: string, country
                 "X-Platform": "Android",
                 "X-ProductVersion": NSOAppVersion,
             },
-            body: params,
         });
-        // const token: string = response.data.webApiServerCredential.accessToken;
-        return Some(response.data);
+        const token: string = response.data.result.webApiServerCredential.accessToken;
+        return Some(token);
     }
     catch (error) {
         console.error(error);
@@ -193,7 +193,7 @@ export async function getAccessToken(language: string, birthday: string, country
     }
 }
 
-export async function auth(): Promise<Option<AccessTokenResponse>> {
+export async function auth(objective: string = "access_token"): Promise<Option<string>> {
     try {
         const auth_params = getLoginUrl();
 
@@ -209,12 +209,13 @@ export async function auth(): Promise<Option<AccessTokenResponse>> {
         const service_id_token = service_token.id_token;
         const service_access_token = service_token.access_token;
 
+        // べつに正しい値でなくても通るからいらんらしい
         const user_info = (await getUserInfo(service_access_token)).unwrap();
         const language = user_info.language;
         const birthday = user_info.birthday;
         const country = user_info.country;
 
-        const f_response = (await fAPI(service_access_token)).unwrap();
+        const f_response = (await fAPI(service_id_token)).unwrap();
         const request_id = f_response.request_id;
         const timestamp = f_response.timestamp;
         const f = f_response.f;
@@ -222,9 +223,12 @@ export async function auth(): Promise<Option<AccessTokenResponse>> {
         // service_token までの生成がうまく行っているかの確認
         console.log(birthday);
 
-        const access_token: AccessTokenResponse = (await getAccessToken(language, birthday, country, service_id_token, request_id, timestamp, f)).unwrap();
+        const access_token: string = (await getAccessToken(language, birthday, country, service_id_token, request_id, timestamp, f)).unwrap();
 
-        return Some(access_token);
+        if (objective == "service_id_token") return Some(service_id_token);
+        else if (objective == "service_access_token") return Some(service_access_token);
+        else if (objective == "session_token") return Some(session_token);
+        else return Some(access_token);
     }
     catch (error) {
         console.error(error);
