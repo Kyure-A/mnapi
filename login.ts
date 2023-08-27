@@ -5,12 +5,12 @@ import * as Selenium from "selenium-webdriver";
 
 type URLparams = {
     state: string,
-    redirect_uri: "npf71b963c1b7b6d119://auth&client_id=71b963c1b7b6d119",
-    scope: "openid%20user%20user.birthday%20user.mii%20user.screenName",
+    redirect_uri: string,
+    client_id: string,
+    scope: "openid%20user%20user.mii%20user.email%20user.links%5B%5D.id",
     response_type: "session_token_code",
     session_token_code_challenge: string,
     session_token_code_challenge_method: "S256",
-    theme: "login_form"
 };
 
 type AuthParams = {
@@ -35,14 +35,16 @@ function generateAuthenticationParams(): AuthParams {
 export function getLoginUrl() {
     const authParams: AuthParams = generateAuthenticationParams();
 
+    const client_id = "5c38e31cd085304b";
+
     const params: URLparams = {
         state: authParams.state,
-        redirect_uri: "npf71b963c1b7b6d119://auth&client_id=71b963c1b7b6d119",
-        scope: "openid%20user%20user.birthday%20user.mii%20user.screenName",
+        redirect_uri: `npf${client_id}://auth`,
+        client_id: client_id,
+        scope: "openid%20user%20user.mii%20user.email%20user.links%5B%5D.id",
         response_type: "session_token_code",
         session_token_code_challenge: authParams.code_challenge,
         session_token_code_challenge_method: "S256",
-        theme: "login_form"
     };
 
     const arrayParams = [];
@@ -53,9 +55,6 @@ export function getLoginUrl() {
     }
 
     const stringParams = arrayParams.join('&');
-
-    // console.log(`https://accounts.nintendo.com/connect/1.0.0/authorize?${stringParams}`);
-    // console.log(authParams.codeVerifier);
 
     return {
         url: `https://accounts.nintendo.com/connect/1.0.0/authorize?${stringParams}`,
