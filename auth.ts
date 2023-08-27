@@ -17,18 +17,6 @@ const Axios = wrapper(axios.create({ jar }));
 Axios.defaults.withCredentials = true;
 Axios.defaults.jar = jar;
 
-type fResponse = {
-    "request_id": string,
-    "timestamp": number,
-    "f": string
-};
-
-type UserInfo = {
-    language: string,
-    birthday: string,
-    country: string,
-};
-
 type AccessTokenResponse = {
     "result": {
         "user": {
@@ -54,10 +42,10 @@ type AccessTokenResponse = {
 
 export async function getSessionToken(session_token_code: string, code_verifier: string): Promise<Option<string>> {
     const params = {
-        client_id: "71b963c1b7b6d119",
+        client_id: "5c38e31cd085304b",
         session_token_code: session_token_code,
         session_token_code_verifier: code_verifier
-    }
+    };
 
     try {
         const response = await Axios.post("https://accounts.nintendo.com/connect/1.0.0/api/session_token", params, {
@@ -78,15 +66,16 @@ export async function getSessionToken(session_token_code: string, code_verifier:
     }
     catch (error) {
         console.error(error);
+
         return None;
     }
 }
 
-export async function fAPI(service_id_token: string): Promise<Option<fResponse>> {
+export async function fAPI(service_id_token: string): Promise<Option<{ request_id: string, timestamp: number, f: string }>> {
     const params = {
         "token": service_id_token,
         "hash_method": 1
-    }
+    };
 
     try {
         const response = await Axios.post("https://api.imink.app/f", params, {
@@ -95,6 +84,7 @@ export async function fAPI(service_id_token: string): Promise<Option<fResponse>>
                 "User-Agent": "nx-embeds/1.0.0",
             },
         });
+
         return Some({
             request_id: response.data.request_id,
             timestamp: response.data.timestamp,
@@ -103,16 +93,17 @@ export async function fAPI(service_id_token: string): Promise<Option<fResponse>>
     }
     catch (error) {
         console.error(error);
+
         return None;
     }
 }
 
 export async function getServiceToken(session_token: string): Promise<Option<{ id_token: string, access_token: string }>> {
     const params = {
-        client_id: "71b963c1b7b6d119",
+        client_id: "5c38e31cd085304b",
         grant_type: "urn:ietf:params:oauth:grant-type:jwt-bearer-session-token",
         session_token: session_token,
-    }
+    };
 
     try {
         const response = await Axios.post("https://accounts.nintendo.com/connect/1.0.0/api/token", params, {
@@ -122,16 +113,18 @@ export async function getServiceToken(session_token: string): Promise<Option<{ i
                 "X-Platform": "Android",
                 "X-ProductVersion": NSOAppVersion,
             },
-        })
+        });
+
         return Some({ id_token: response.data.id_token, access_token: response.data.access_token });
     }
     catch (error) {
         console.error(error);
+
         return None;
     }
 }
 
-export async function getUserInfo(service_token: string): Promise<Option<UserInfo>> {
+export async function getUserInfo(service_token: string): Promise<Option<{ language: string, birthday: string, country: string, }>> {
     const params = {
         "Authorization": `Bearer ${service_token}`,
         "Content-Type": "application/json; charset=utf-8",
@@ -153,6 +146,7 @@ export async function getUserInfo(service_token: string): Promise<Option<UserInf
     }
     catch (error) {
         console.log(error);
+
         return None;
     }
 }
@@ -184,11 +178,15 @@ export async function getAccessToken(language: string, birthday: string, country
                 "X-ProductVersion": NSOAppVersion,
             },
         });
-        const token: string = response.data.result.webApiServerCredential.accessToken;
+        const data: AccessTokenResponse = response.data;
+
+        const token: string = data.result.webApiServerCredential.accessToken;
+
         return Some(token);
     }
     catch (error) {
         console.error(error);
+
         return None;
     }
 }
@@ -199,19 +197,19 @@ export async function auth(): Promise<Option<string>> {
 
         console.log("Auth URL: " + "\u001b[32m" + auth_params.url + "\u001b[0m"); // green text
 
-        const login_url = redirectLinkParser(await input("Please jump to the following URL, copy the URL starting with 'npf71b963c1b7b6d119://' and paste it into the standard input: "));
+        const login_url = redirectLinkParser(await input("Please jump to the following URL, copy the URL starting with 'np5c38e31cd085304b://' and paste it into the standard input: "));
 
         const session_token_code: string = login_url.session_token_code;
         const code_verifier = auth_params.code_verifier;
         const session_token = (await getSessionToken(session_token_code, code_verifier)).unwrap();
 
-        const service_token = (await getServiceToken(session_token)).unwrap();
-        const service_id_token = service_token.id_token;
+        console.log("session_token: " + "\u001b[32m" + session_token + "\u001b[0m");
 
-        return Some(service_id_token);
+        return Some(session_token);
     }
     catch (error) {
         console.error(error);
+
         return None;
     }
 }
