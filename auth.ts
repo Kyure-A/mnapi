@@ -193,7 +193,7 @@ export async function getAccessToken(language: string, birthday: string, country
     }
 }
 
-export async function auth(objective: string = "access_token"): Promise<Option<string>> {
+export async function auth(): Promise<Option<string>> {
     try {
         const auth_params = getLoginUrl();
 
@@ -207,28 +207,8 @@ export async function auth(objective: string = "access_token"): Promise<Option<s
 
         const service_token = (await getServiceToken(session_token)).unwrap();
         const service_id_token = service_token.id_token;
-        const service_access_token = service_token.access_token;
 
-        // べつに正しい値でなくても通るからいらんらしい
-        const user_info = (await getUserInfo(service_access_token)).unwrap();
-        const language = user_info.language;
-        const birthday = user_info.birthday;
-        const country = user_info.country;
-
-        const f_response = (await fAPI(service_id_token)).unwrap();
-        const request_id = f_response.request_id;
-        const timestamp = f_response.timestamp;
-        const f = f_response.f;
-
-        // service_token までの生成がうまく行っているかの確認
-        console.log(birthday);
-
-        const access_token: string = (await getAccessToken(language, birthday, country, service_id_token, request_id, timestamp, f)).unwrap();
-
-        if (objective == "service_id_token") return Some(service_id_token);
-        else if (objective == "service_access_token") return Some(service_access_token);
-        else if (objective == "session_token") return Some(session_token);
-        else return Some(access_token);
+        return Some(service_id_token);
     }
     catch (error) {
         console.error(error);

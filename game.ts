@@ -4,7 +4,7 @@ import axios from "axios";
 import { wrapper } from "axios-cookiejar-support";
 import { CookieJar } from "tough-cookie";
 
-const NSOAppVersion = "2.7.0";
+const NSOAppVersion = "2.1.0";
 
 declare module 'axios' {
     interface AxiosRequestConfig {
@@ -18,18 +18,34 @@ Axios.defaults.withCredentials = true;
 Axios.defaults.jar = jar;
 
 type Game = {
-    "whiteList": string[],
-    "id": number,
-    "uri": string,
-    "name": string,
-    "imageUri": string,
-    "hogehoge": string,
+    "deviceType": string,  //"HAC"
+    "firstPlayedAt": string, //"2023-01-12T04:48:12+09:00"
+    "imageUrl": string, //"https://atum-img-lp1.cdn.nintendo.net/i/c/1427016279c04de0b080b8dd26e209e0_256",
+    "lastPlayedAt": string, //"2023-08-09T16:11:06+09:00",
+    "lastUpdatedAt": string, // "2023-08-27T21:28:38+09:00",
+    "titleId": string, //"01008F6008C5E000",
+    "titleName": string, //"ポケットモンスター バイオレット",
+    "totalPlayedDays": number, //47,
+    "totalPlayedMinutes": number, //23827
+}
+
+type RecentPlayHistory = {
+    "dailyPlayHistories": [
+        {
+            "imageUrl": string, //"https://atum-img-lp1.cdn.nintendo.net/i/c/1427016279c04de0b080b8dd26e209e0_256",
+            "titleId": string, //"01008F6008C5E000",
+            "titleName": string, //"ポケットモンスター バイオレット",
+            "totalPlayedMinutes": number, //9
+        }
+    ],
+    "playedDate": string //"2023-08-09T00:00:00+09:00"
 }
 
 type GameList = {
-    "status": number,
-    "correlationId": string,
-    "result": Game[]
+    "hiddenTitleList": any,
+    "lastUpdatedAt": string,
+    "playHistories": Game[],
+    "recentPlayHistories": RecentPlayHistory[]
 }
 
 export async function getGameList(access_token: string) {
@@ -40,13 +56,13 @@ export async function getGameList(access_token: string) {
         "Authorization": `Bearer ${access_token}`,
         "Content-Type": "application/json; charset=utf-8",
         "Connection": "Keep-Alive",
-        "User-Agent": "com.nintendo.znca/${NSOAppVersion} (Android/7.1.2)",
+        "User-Agent": "com.nintendo.znej/${NSOAppVersion} (iOS/16.6)",
         "X-ProductVersion": NSOAppVersion,
         "X-Platform": "Android",
     }
 
     try {
-        const response = await Axios.post("https://api-lp1.znc.srv.nintendo.net/v1/Game/ListWebServices", {
+        const response = await Axios.get("https://news-api.entry.nintendo.co.jp/api/v1.1/users/me/play_histories", {
             headers: headers,
         });
 
@@ -61,14 +77,15 @@ export async function getGameList(access_token: string) {
 function parseGameList(game_list: GameList) {
     let result = [];
 
-    for (let i = 0; i < game_list.result.length; i++) {
-        const game_info = {
-            name: game_list.result[i].name,
-            icon: game_list.result[i].imageUri,
-            url: game_list.result[i].uri,
-            playtime: game_list.result[i].hogehoge
-        }
-        result.push(game_info);
+    for (let game of game_list.playHistories) {
+        const game_title: string = game.titleName;
+        const game_url: string = game.imageUrl;
+        const total_played_hours: number = game.totalPlayedMinutes / 60;
+        result.push({
+            game_title,
+            game_url,
+            total_played_hours
+        })
     }
 
     return result;
