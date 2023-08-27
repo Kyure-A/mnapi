@@ -69,7 +69,7 @@ export async function getGameList(service_id_token: string): Promise<Option<Game
     }
 }
 
-function parseGameList(game_list: GameList): { title: string, icon: string, total_played_hours: number }[] {
+export function parseGameList(game_list: GameList): { title: string, icon: string, total_played_hours: number }[] {
     let result = [];
 
     for (let game of game_list.playHistories) {
@@ -77,7 +77,7 @@ function parseGameList(game_list: GameList): { title: string, icon: string, tota
 
         const title: string = game.titleName;
         const icon: string = game.imageUrl;
-        const total_played_hours: number = game.totalPlayedMinutes / 60;
+        const total_played_hours: number = parseFloat((game.totalPlayedMinutes / 60).toFixed(1));
 
         result.push({
             title,
