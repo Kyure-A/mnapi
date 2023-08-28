@@ -1,7 +1,21 @@
 import { Option, Some, None } from "@sniptt/monads";
 import * as crypto from "crypto";
 import * as dotenv from "dotenv"; dotenv.config();
-import * as Selenium from "selenium-webdriver";
+import { NSOAppVersion } from "./constant.js"
+import axios from "axios";
+import { wrapper } from "axios-cookiejar-support";
+import { CookieJar } from "tough-cookie";
+
+declare module 'axios' {
+    interface AxiosRequestConfig {
+        jar?: CookieJar;
+    }
+}
+
+const jar = new CookieJar();
+const Axios = wrapper(axios.create({ jar }));
+Axios.defaults.withCredentials = true;
+Axios.defaults.jar = jar;
 
 type URLparams = {
     state: string,
@@ -19,7 +33,28 @@ type AuthParams = {
     code_challenge: string,
 }
 
-// https://dev.to/mathewthe2/intro-to-nintendo-switch-rest-api-2cm7
+type AccessTokenResponse = {
+    "result": {
+        "user": {
+            "imageUri": string, // url
+            "supportId": string,
+            "name": string,
+            "id": string[]
+        },
+        "firebaseCredential": {
+            "accessToken": string, // firebase token here
+            "expiresIn": number // 3600
+        },
+        "webApiServerCredential": {
+            "accessToken": string, // webapi token here
+            "expiresIn": number //7200
+        }
+    },
+    "status": number, // 0
+    "correlationId": string // "61becf03-0ae45082"
+};
+
+// --------------------------------------------------------------------------------------------------------- //
 
 function generateAuthenticationParams(): AuthParams {
     const state = crypto.randomBytes(36).toString('base64url');
@@ -62,104 +97,154 @@ export function getLoginUrl() {
     }
     // Nintendo の page に redirect されて、 authorize-switch-approval-link に session_token_code がふくまれる url がはいってる
 }
-// Selenium でうまいことやっていきたい
 
-function NSOId(): Option<string> {
-    const result: string | undefined = process.env.NSOid;
+export async function getSessionToken(session_token_code: string, code_verifier: string): Promise<Option<string>> {
+    const params = {
+        client_id: "5c38e31cd085304b",
+        session_token_code: session_token_code,
+        session_token_code_verifier: code_verifier
+    };
 
-    if (typeof result == "string") return Some(result);
-    else return None;
-}
-
-function NSOPass(): Option<string> {
-    const result: string | undefined = process.env.NSOpassword;
-
-    if (typeof result == "string") return Some(result);
-    else return None;
-}
-
-export function getSessionTokenCode(): Option<string> {
-    // 最悪使わなくてもなんとかなるっぽい
-    const url = getLoginUrl().url;
-    const selenium = new Selenium.Builder();
-    const browser = selenium.forBrowser("chrome").build();
-    const window = browser.get(url);
-
-    // 自動化が検知されて error を吐いてくるのでなんとかする
-    window.then(function() {
-        const timeOut = browser.manage().setTimeouts({
-            implicit: 5000,
+    try {
+        const response = await Axios.post("https://accounts.nintendo.com/connect/1.0.0/api/session_token", params, {
+            headers: {
+                "Accept": "application/json",
+                "Accept-Encoding": "gzip",
+                "Accept-Language": "en-US",
+                "Connection": "Keep-Alive",
+                "Content-Type": "application/x-www-form-urlencoded",
+                "Host": "accounts.nintendo.com",
+                "User-Agent": `OnlineLounge/${NSOAppVersion} NASDKAPI Android`,
+                "X-Platform": "Android",
+                "X-ProductVersion": NSOAppVersion,
+            },
         });
 
-        return timeOut;
+        return Some(response.data.session_token);
+    }
+    catch (error) {
+        console.error(error);
 
-    }).then(() => {
+        return None;
+    }
+}
 
-        const loginIdBox = browser.findElement(
-            Selenium.By.id("login-form-id")
-        );
+export async function fAPI(service_id_token: string): Promise<Option<{ request_id: string, timestamp: number, f: string }>> {
+    const params = {
+        "token": service_id_token,
+        "hash_method": 1
+    };
 
-        return loginIdBox;
+    try {
+        const response = await Axios.post("https://api.imink.app/f", params, {
+            headers: {
+                "Content-Type": "application/json; charset=utf-8",
+                "User-Agent": "nx-embeds/1.0.0",
+            },
+        });
 
-    }).then((loginIdBox) => {
+        return Some({
+            request_id: response.data.request_id,
+            timestamp: response.data.timestamp,
+            f: response.data.f
+        });
+    }
+    catch (error) {
+        console.error(error);
 
-        const sendLoginId = loginIdBox.sendKeys(NSOId().unwrap());
+        return None;
+    }
+}
 
-        return sendLoginId;
+export async function getServiceToken(session_token: string): Promise<Option<{ id_token: string, access_token: string }>> {
+    const params = {
+        client_id: "5c38e31cd085304b",
+        grant_type: "urn:ietf:params:oauth:grant-type:jwt-bearer-session-token",
+        session_token: session_token,
+    };
 
-    }).then(() => {
+    try {
+        const response = await Axios.post("https://accounts.nintendo.com/connect/1.0.0/api/token", params, {
+            headers: {
+                "Content-Type": "application/x-www-form-urlencoded",
+                "User-Agent": `OnlineLounge/${NSOAppVersion} NASDKAPI Android`,
+                "X-Platform": "Android",
+                "X-ProductVersion": NSOAppVersion,
+            },
+        });
 
-        console.log("Username filled");
+        return Some({ id_token: response.data.id_token, access_token: response.data.access_token });
+    }
+    catch (error) {
+        console.error(error);
 
-        const loginPassBox = browser.findElement(
-            Selenium.By.id("login-form-password")
-        );
-        return loginPassBox;
+        return None;
+    }
+}
 
-    }).then((loginPassBox) => {
+export async function getUserInfo(service_token: string): Promise<Option<{ language: string, birthday: string, country: string, }>> {
+    const params = {
+        "Authorization": `Bearer ${service_token}`,
+        "Content-Type": "application/json; charset=utf-8",
+        "User-Agent": "OnlineLounge/2.7.0 NASDKAPI Android",
+        "X-Platform": "Android",
+        "X-ProductVersion": "2.7.0",
+    }
 
-        const sendLoginPass = loginPassBox.sendKeys(NSOPass().unwrap());
-        return sendLoginPass;
-    }).then(() => {
-        console.log("Password filled");
+    try {
+        const response = await Axios.get("https://api.accounts.nintendo.com/2.0.0/users/me", {
+            headers: params,
+        });
 
-        const loginButton = browser.findElement(
-            Selenium.By.id("accounts-login-button")
-        );
-        return loginButton;
+        return Some({
+            language: response.data.language,
+            birthday: response.data.birthday,
+            country: response.data.country
+        });
+    }
+    catch (error) {
+        console.log(error);
 
-    }).then((loginButton) => {
+        return None;
+    }
+}
 
-        loginButton.click();
-        console.log("Login Completed");
-
-    }).then(() => {
-
-        const redirectLinkElem = browser.findElement(
-            Selenium.By.id("authorize-switch-approval-link")
-        );
-
-        return redirectLinkElem;
-
-    }).then((redirectLinkElem) => {
-
-        const redirectLink = redirectLinkElem.getAttribute("href");
-
-        return redirectLink;
-
-    }).then((redirectLink) => {
-
-        const parser = new URL(redirectLink);
-
-        if (parser.searchParams.has("session_token_code")) {
-            const result = parser.searchParams.get("session_token_code");
-            return Some(result);
+export async function getAccessToken(language: string, birthday: string, country: string, service_token: string, request_id: string, timestamp: number, f: string): Promise<Option<string>> {
+    const params = {
+        "parameter": {
+            "language": language,
+            "naBirthday": birthday,
+            "naCountry": country,
+            "naIdToken": service_token,
+            "requestId": request_id,
+            "timestamp": timestamp,
+            "f": f
         }
-        else return None;
+    }
 
-    }).catch((error) => {
-        console.log("Error ", error);
-    });
+    try {
+        const response = await Axios.post("https://api-lp1.znc.srv.nintendo.net/v1/Account/Login", params, {
+            headers: {
+                "Accept": "application/json",
+                "Accept-Encoding": "gzip",
+                "Accept-Language": language,
+                "Authorization": "Bearer",
+                "Connection": "Keep-Alive",
+                "Content-Type": "application/json; charset=utf-8",
+                "User-Agent": `com.nintendo.znca/${NSOAppVersion} (Android/7.1.2)`,
+                "X-Platform": "Android",
+                "X-ProductVersion": NSOAppVersion,
+            },
+        });
+        const data: AccessTokenResponse = response.data;
 
-    return None;
+        const token: string = data.result.webApiServerCredential.accessToken;
+
+        return Some(token);
+    }
+    catch (error) {
+        console.error(error);
+
+        return None;
+    }
 }
