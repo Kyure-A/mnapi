@@ -1,4 +1,5 @@
-import { Option, Some, None } from "@sniptt/monads";
+import type { Option } from "@sniptt/monads";
+import { Some, None } from "@sniptt/monads";
 import * as crypto from "crypto";
 import * as dotenv from "dotenv"; dotenv.config();
 import { NSOAppVersion } from "./constant.js"

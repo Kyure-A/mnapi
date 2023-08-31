@@ -1,6 +1,7 @@
 import { getLoginUrl, getSessionToken } from "./login.js"
 import { input, redirectLinkParser } from "./util.js"
-import { Option, Some, None } from "@sniptt/monads";
+import type { Option } from "@sniptt/monads";
+import { Some, None } from "@sniptt/monads";
 
 export async function auth(): Promise<string> {
     try {
