@@ -1,5 +1,5 @@
-import { Option, Some, None } from "@sniptt/monads";
-import { auth } from "./auth.js"
+import type { Option } from "@sniptt/monads";
+import { Some, None } from "@sniptt/monads";
 import axios from "axios";
 import { wrapper } from "axios-cookiejar-support";
 import { CookieJar } from "tough-cookie";
@@ -41,14 +41,20 @@ type RecentPlayHistory = {
     "playedDate": string // "2023-08-09T00:00:00+09:00"
 }
 
-type GameList = {
+type GameHistories = {
     "hiddenTitleList": any,
     "lastUpdatedAt": string,
     "playHistories": PlayHistory[],
     "recentPlayHistories": RecentPlayHistory[]
 }
 
-export async function getGameList(service_id_token: string): Promise<Option<GameList>> {
+type GameList = {
+    title: string,
+    icon: string,
+    total_played_hours: number
+}
+
+export async function getGameList(service_id_token: string): Promise<Option<GameHistories>> {
     try {
         const response = await Axios.get("https://news-api.entry.nintendo.co.jp/api/v1.1/users/me/play_histories", {
             headers: {
@@ -69,22 +75,55 @@ export async function getGameList(service_id_token: string): Promise<Option<Game
     }
 }
 
-export function parseGameList(game_list: GameList): { title: string, icon: string, total_played_hours: number }[] {
-    let result = [];
+/* option = 0: 3DS (CTR) と Switch (HAC) の list が返る
+   option = 1: Switch (HAC) の list が返る
+   option = 2: 3DS (CTR) の list が返る */
 
-    for (let game of game_list.playHistories) {
-        if (game.deviceType != "HAC") continue;
+function _parseGameList(option: 0 | 1 | 2) {
+    return (game_list: GameHistories): GameList[] => {
+        let result = [];
 
-        const title: string = game.titleName;
-        const icon: string = game.imageUrl;
-        const total_played_hours: number = parseFloat((game.totalPlayedMinutes / 60).toFixed(1));
+        // 即時実行関数式
+        let device_type: string | undefined = (() => {
+            if (option == 1) return "CTR";
+            else if (option == 2) return "HAC";
+            else return undefined;
+        })();
 
-        result.push({
-            title,
-            icon,
-            total_played_hours
-        });
+        for (let game of game_list.playHistories) {
+            if (game.deviceType == device_type) continue;
+
+            const title: string = game.titleName;
+            const icon: string = game.imageUrl;
+            const total_played_hours: number = parseFloat((game.totalPlayedMinutes / 60).toFixed(1));
+
+            result.push({
+                title,
+                icon,
+                total_played_hours
+            });
+        }
+        return result;
     }
-    return result;
 }
 
+// curried function を使ってみたかっただけ
+export const parseGameList = _parseGameList(0);
+export const parseSwitchGameList = _parseGameList(1);
+export const parse3DSGameList = _parseGameList(2);
+
+export function sortGameList(game_list: GameList[], quantity: number = game_list.length) {
+    const compare = (x: GameList, y: GameList): number => {
+        if (x.total_played_hours >= y.total_played_hours) return -1;
+        else return 1;
+    }
+
+    const sorted: GameList[] = Array.from(game_list).sort(compare);
+    const result: GameList[] = [];
+
+    for (let i = 0; i < Math.min(quantity, game_list.length); i++) {
+        result.push(sorted[i]);
+    }
+
+    return result;
+}
