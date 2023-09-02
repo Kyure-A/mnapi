@@ -49,6 +49,7 @@ type GameHistories = {
 
 type GameList = {
     title: string,
+    id: string,
     icon: string,
     total_played_hours: number
 }
@@ -87,11 +88,12 @@ function _parseGameList(option: 0 | 1 | 2) {
             else return undefined;
         })();
 
-        const result = game_list.playHistories
+        const result: GameList[] = game_list.playHistories
             .filter(game => game.deviceType != ignore_device_type)
             .map(game => {
                 return {
                     title: game.titleName,
+                    id: game.titleId.toLowerCase(),
                     icon: game.imageUrl,
                     total_played_hours: parseFloat((game.totalPlayedMinutes / 60).toFixed(1))
                 }
