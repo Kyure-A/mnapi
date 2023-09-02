@@ -2,7 +2,7 @@ import type { Option } from "@sniptt/monads";
 import { Some, None } from "@sniptt/monads";
 import * as crypto from "crypto";
 import * as dotenv from "dotenv"; dotenv.config();
-import { NSOAppVersion } from "./constant.js"
+import { NSOAppVersion, MyNintendoAppVersion } from "./constant.js"
 import axios from "axios";
 import { wrapper } from "axios-cookiejar-support";
 import { CookieJar } from "tough-cookie";
@@ -115,9 +115,7 @@ export async function getSessionToken(session_token_code: string, code_verifier:
                 "Connection": "Keep-Alive",
                 "Content-Type": "application/x-www-form-urlencoded",
                 "Host": "accounts.nintendo.com",
-                "User-Agent": `OnlineLounge/${NSOAppVersion} NASDKAPI Android`,
-                "X-Platform": "Android",
-                "X-ProductVersion": NSOAppVersion,
+                "User-Agent": `Entry/${MyNintendoAppVersion} (com.nintendo.znej; build:39; iOS 16.6.0) NASDK/${MyNintendoAppVersion}`,
             },
         });
 
@@ -130,7 +128,68 @@ export async function getSessionToken(session_token_code: string, code_verifier:
     }
 }
 
-export async function fAPI(service_id_token: string): Promise<Option<{ request_id: string, timestamp: number, f: string }>> {
+export async function getServiceToken(session_token: string): Promise<Option<{ id_token: string, access_token: string }>> {
+    const params = {
+        client_id: "5c38e31cd085304b",
+        grant_type: "urn:ietf:params:oauth:grant-type:jwt-bearer-session-token",
+        session_token: session_token,
+    };
+
+    try {
+        const response = await Axios.post("https://accounts.nintendo.com/connect/1.0.0/api/token", params, {
+            headers: {
+                "Accept": "application/json",
+                "Accept-Encoding": "gzip",
+                "Accept-Language": "en-US",
+                "Connection": "Keep-Alive",
+                "Content-Type": "application/x-www-form-urlencoded",
+                "Host": "accounts.nintendo.com",
+                "User-Agent": `Entry/${MyNintendoAppVersion} (com.nintendo.znej; build:39; iOS 16.6.0) NASDK/${MyNintendoAppVersion}`,
+            },
+        });
+
+        return Some({ id_token: response.data.id_token, access_token: response.data.access_token });
+    }
+    catch (error) {
+        console.error(error);
+
+        return None;
+    }
+}
+
+export async function getUserInfo(service_token: string): Promise<Option<{ language: string, birthday: string, country: string, }>> {
+    const params = {
+        "Accept": "application/json",
+        "Accept-Encoding": "gzip",
+        "Accept-Language": "en-US",
+        "Authorization": `Bearer ${service_token}`,
+        "Connection": "Keep-Alive",
+        "Content-Type": "application/x-www-form-urlencoded",
+        "Host": "accounts.nintendo.com",
+        "User-Agent": `Entry/${MyNintendoAppVersion} (com.nintendo.znej; build:39; iOS 16.6.0) NASDK/${MyNintendoAppVersion}`,
+    }
+
+    try {
+        const response = await Axios.get("https://api.accounts.nintendo.com/2.0.0/users/me", {
+            headers: params,
+        });
+
+        return Some({
+            language: response.data.language,
+            birthday: response.data.birthday,
+            country: response.data.country
+        });
+    }
+    catch (error) {
+        console.log(error);
+
+        return None;
+    }
+}
+
+// below functions are unused ><
+
+async function fAPI(service_id_token: string): Promise<Option<{ request_id: string, timestamp: number, f: string }>> {
     const params = {
         "token": service_id_token,
         "hash_method": 1
@@ -157,60 +216,7 @@ export async function fAPI(service_id_token: string): Promise<Option<{ request_i
     }
 }
 
-export async function getServiceToken(session_token: string): Promise<Option<{ id_token: string, access_token: string }>> {
-    const params = {
-        client_id: "5c38e31cd085304b",
-        grant_type: "urn:ietf:params:oauth:grant-type:jwt-bearer-session-token",
-        session_token: session_token,
-    };
-
-    try {
-        const response = await Axios.post("https://accounts.nintendo.com/connect/1.0.0/api/token", params, {
-            headers: {
-                "Content-Type": "application/x-www-form-urlencoded",
-                "User-Agent": `OnlineLounge/${NSOAppVersion} NASDKAPI Android`,
-                "X-Platform": "Android",
-                "X-ProductVersion": NSOAppVersion,
-            },
-        });
-
-        return Some({ id_token: response.data.id_token, access_token: response.data.access_token });
-    }
-    catch (error) {
-        console.error(error);
-
-        return None;
-    }
-}
-
-export async function getUserInfo(service_token: string): Promise<Option<{ language: string, birthday: string, country: string, }>> {
-    const params = {
-        "Authorization": `Bearer ${service_token}`,
-        "Content-Type": "application/json; charset=utf-8",
-        "User-Agent": "OnlineLounge/2.7.0 NASDKAPI Android",
-        "X-Platform": "Android",
-        "X-ProductVersion": "2.7.0",
-    }
-
-    try {
-        const response = await Axios.get("https://api.accounts.nintendo.com/2.0.0/users/me", {
-            headers: params,
-        });
-
-        return Some({
-            language: response.data.language,
-            birthday: response.data.birthday,
-            country: response.data.country
-        });
-    }
-    catch (error) {
-        console.log(error);
-
-        return None;
-    }
-}
-
-export async function getAccessToken(language: string, birthday: string, country: string, service_token: string, request_id: string, timestamp: number, f: string): Promise<Option<string>> {
+async function getAccessToken(language: string, birthday: string, country: string, service_token: string, request_id: string, timestamp: number, f: string): Promise<Option<string>> {
     const params = {
         "parameter": {
             "language": language,
