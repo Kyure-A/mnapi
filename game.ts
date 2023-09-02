@@ -1,10 +1,9 @@
+import { MyNintendoAppVersion } from "./constant.js"
 import type { Option } from "@sniptt/monads";
 import { Some, None } from "@sniptt/monads";
 import axios from "axios";
 import { wrapper } from "axios-cookiejar-support";
 import { CookieJar } from "tough-cookie";
-
-const MyNintendoAppVersion = "2.1.0";
 
 declare module 'axios' {
     interface AxiosRequestConfig {
