@@ -81,28 +81,23 @@ export async function getGameList(service_id_token: string): Promise<Option<Game
 
 function _parseGameList(option: 0 | 1 | 2) {
     return (game_list: GameHistories): GameList[] => {
-        let result = [];
-
         // 即時実行関数式
-        let device_type: string | undefined = (() => {
+        let ignore_device_type: string | undefined = (() => {
             if (option == 1) return "CTR";
             else if (option == 2) return "HAC";
             else return undefined;
         })();
 
-        for (let game of game_list.playHistories) {
-            if (game.deviceType == device_type) continue;
-
-            const title: string = game.titleName;
-            const icon: string = game.imageUrl;
-            const total_played_hours: number = parseFloat((game.totalPlayedMinutes / 60).toFixed(1));
-
-            result.push({
-                title,
-                icon,
-                total_played_hours
+        const result = game_list.playHistories
+            .filter(game => game.deviceType != ignore_device_type)
+            .map(game => {
+                return {
+                    title: game.titleName,
+                    icon: game.imageUrl,
+                    total_played_hours: parseFloat((game.totalPlayedMinutes / 60).toFixed(1))
+                }
             });
-        }
+
         return result;
     }
 }
@@ -119,11 +114,6 @@ export function sortGameList(game_list: GameList[], quantity: number = game_list
     }
 
     const sorted: GameList[] = Array.from(game_list).sort(compare);
-    const result: GameList[] = [];
 
-    for (let i = 0; i < Math.min(quantity, game_list.length); i++) {
-        result.push(sorted[i]);
-    }
-
-    return result;
+    return sorted.slice(0, Math.min(quantity, game_list.length));
 }
