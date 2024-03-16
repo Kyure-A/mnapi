@@ -1,0 +1,23 @@
+{
+    "name": "mnapi",
+    "version": "0.0.1",
+    "scripts": {
+    },
+    "devDependencies": {
+	"@types/base64-url": "^2.2.0",
+	"@types/qs": "^6.9.7",
+	"@types/tough-cookie": "^4.0.2",
+	"tslib": "^2.4.1",
+	"typescript": "^5.0.0",
+    },
+    "type": "module",
+    "dependencies": {
+	"@sniptt/monads": "^0.5.10",
+	"axios": "^1.4.0",
+	"axios-cookiejar-support": "^4.0.7",
+	"base64-url": "^2.3.3",
+	"dotenv": "^16.3.1",
+	"qs": "^6.11.2",
+	"tough-cookie": "^4.1.3"
+    }
+}
